@@ -11,11 +11,11 @@
 
 ## 구성 요소
 
-| `vectordb-setting` | 마크다운(.md) 문서를 벡터로 임베딩하여 ChromaDB에 저장하는 **일회성 Job** |
-| `vectordb-server`  | 저장된 벡터 DB에서 관련 문서를 검색하는 **FastAPI 서버** |
-| `llm-api`          | 프롬프트를 입력 받아 답변을 생성하는 **LLM 추론 API** |
-| `rag-controller`   | Vector DB에서 context 검색 후, 사용자 질의와 함께 LLM에 전달하여 최종 답변을 제공하는 **중앙 API 컨트롤러** |
-| `k8s_manifest.yaml`| 위 구성 요소들을 Kubernetes환경에 배포하는 통합 매니페스트|
+- `vectordb-setting` 마크다운(.md) 문서를 벡터로 임베딩하여 ChromaDB에 저장하는 **일회성 Job**
+- `vectordb-server`  저장된 벡터 DB에서 관련 문서를 검색하는 **FastAPI 서버**
+- `llm-api`          프롬프트를 입력 받아 답변을 생성하는 **LLM 추론 API**
+- `rag-controller`   Vector DB에서 context 검색 후, 사용자 질의와 함께 LLM에 전달하여 최종 답변을 제공하는 **중앙 API 컨트롤러**
+- `k8s_manifest.yaml`위 구성 요소들을 Kubernetes환경에 배포하는 통합 매니페스트
 
 ## 디렉토리 구조
 📁 kakao_rag_project/
