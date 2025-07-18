@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY . .
 
 # 설치 중 OOM 방지 및 tokenizer 관련 에러 방지 옵션 설정
 ENV TRANSFORMERS_CACHE=/app/cache
@@ -22,8 +22,6 @@ ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:64
 
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir -r requirements.txt
-
-COPY . .
 
 EXPOSE 8000
 
