@@ -9,15 +9,19 @@ from transformers import AutoTokenizer, AutoModel
 from langchain.document_loaders import DirectoryLoader
 from langchain.schema import Document
 from langchain.embeddings.base import Embeddings
-from langchain.text_splitter import MarkdownHeaderTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
 from langchain.vectorstores import Chroma
 
+import chromadb
 from chromadb.config import Settings
 
 
 # 로깅
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)-8s | %(message)s")
 log = logging.getLogger("vectordb-setting")
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 
 # 임베딩 클래스
 class KananaEmbeddings(Embeddings):
@@ -31,6 +35,7 @@ class KananaEmbeddings(Embeddings):
         ).to(self.device).eval()
 
     def _encode(self, texts: List[str], chunk_size: int = 32) -> List[List[float]]:
+
         all_embeddings = []
 
         for i in range(0, len(texts), chunk_size):
@@ -50,7 +55,7 @@ class KananaEmbeddings(Embeddings):
                 last_hidden = outputs.last_hidden_state
                 attention_mask = inputs["attention_mask"]
 
-            # Mean Pooling
+                # Mean Pooling
                 mask = attention_mask.unsqueeze(-1).expand(last_hidden.size()).float()
                 summed = torch.sum(last_hidden * mask, dim=1)
                 count = torch.clamp(mask.sum(dim=1), min=1e-9)
@@ -75,17 +80,23 @@ def build_chroma(
         persist_every: int,
         preview: int,
         model_name: str,
+        chunk_size: int,
+        chunk_overlap: int,
         device: str):
 
     log.info(f"▶ 시작: data_path={data_path} | persist_dir={persist_dir}")
 
-    splitter = MarkdownHeaderTextSplitter(
-        headers_to_split_on=[
-        ("#", "h1"),
-        ("##", "h2"),
-        ("###", "h3"),
-        ]
+    # 문서 나누기
+    header_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=[("###", "h3"), ("##", "h2"), ("#", "h1")]
     )
+
+    char_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=["\n## ", "\n# ", "\n", " "]
+    )
+
     embedder = KananaEmbeddings(model_name, device)
 
     vectordb = Chroma(
@@ -98,63 +109,76 @@ def build_chroma(
         )
     )
 
+    # 문서 로딩
     loader = DirectoryLoader(data_path, glob="**/*.md")
     docs = loader.load()
 
     log.info(f"총 파일 수: {len(docs)}")
 
+
+    # 인덱싱
     batch: List[Document] = []
     batch_count = 0
     total_chunks = 0
 
     for doc in docs:
         source = doc.metadata.get("source", "")
-        split_docs: List[Document] = splitter.split_text(doc.page_content)
+        header_sections = header_splitter.split_text(doc.page_content)
 
-        for idx, chunk in enumerate(split_docs):
-            chunk.metadata["source"] = source  # 원본 파일 이름
-            chunk.metadata["chunk_id"] = idx   # 인덱싱
-            batch.append(chunk)
-            total_chunks += 1
+        for section in header_sections:
 
-            if len(batch) >= batch_size:
-                batch_count += 1
-                _flush_batch(vectordb, batch, batch_count)
-                batch.clear()
-                if persist_every > 0 and batch_count % persist_every == 0:
-                    vectordb.persist()
+            section_doc = Document(page_content=str(section), metadata={"source": source})
+            split_docs = char_splitter.split_documents([section_doc])
+
+            for idx, chunk in enumerate(split_docs):
+                chunk.metadata["chunk_id"] = idx
+                batch.append(chunk)
+                total_chunks += 1
+
+                if len(batch) >= batch_size:
+                    batch_count += 1
+                    _flush_batch(vectordb, batch, batch_count)
+                    batch.clear()
+                    if persist_every > 0 and batch_count % persist_every == 0:
+                        vectordb.persist()
 
     if batch:
         batch_count += 1
         _flush_batch(vectordb, batch, batch_count)
 
     vectordb.persist()
-    log.info("최종 저장")
-    log.info(f"완료 | 총 청크 수: {total_chunks} | 배치 수: {batch_count}")
+    log.info("최종 저장 완료")
+    log.info(f"총 청크 수: {total_chunks} | 총 배치 수: {batch_count}")
 
+    # Preview
     if preview > 0:
-        sample = vectordb.get(include=["documents"], limit=preview)
+        sample = vectordb._collection.get(include=["documents"], limit=preview)
         for i, doc in enumerate(sample["documents"]):
-            clean_doc = doc[:50].replace("\n", " ")
-            log.info(f"Preview #{i+1} | chunk='{clean_doc}...'")
+            clean_doc = doc[:80].replace("\n", " ")
+            log.info(f" Preview #{i+1} | '{clean_doc}...'")
 
     return vectordb.as_retriever(search_kwargs={"k": 3})
 
 # 배치 flush
 def _flush_batch(vectordb: Chroma, docs_batch: List[Document], batch_idx: int):
-
     log.info(f"▶ Batch {batch_idx} | size={len(docs_batch)}")
-    vectordb.add_documents(docs_batch)
+    vectordb._collection.add(
+        documents=[d.page_content for d in docs_batch],
+        metadatas=[d.metadata for d in docs_batch],
+        ids=[f"batch{batch_idx}-{i}" for i in range(len(docs_batch))]
+    )
 
 # main
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="vectordb builder")
     parser.add_argument("--data-path", default=os.getenv("DATA_PATH", "./it_tech_news_data"))
     parser.add_argument("--persist-dir", default=os.getenv("PERSIST_DIR", "./chroma_db"))
-    parser.add_argument("--batch-size", type=int, default=int(os.getenv("BATCH_SIZE", 64)))
+    parser.add_argument("--batch-size", type=int, default=int(os.getenv("BATCH_SIZE", 32)))
     parser.add_argument("--persist-every", type=int, default=int(os.getenv("PERSIST_EVERY", 3)))
     parser.add_argument("--preview", type=int, default=int(os.getenv("PREVIEW", 2)))
-    parser.add_argument("--model-name", default="intfloat/e5-small-v2")
+    parser.add_argument("--model-name", default="sentence-transformers/all-mpnet-base-v2")
+    parser.add_argument("--chunk-size", type=int, default=70, help="Max characters per chunk")
+    parser.add_argument("--chunk-overlap", type=int, default=20, help="Overlap characters between chunks")
 
     args, _ = parser.parse_known_args()
     return args
@@ -170,5 +194,7 @@ if __name__ == "__main__":
         persist_every=args.persist_every,
         preview=args.preview,
         model_name=args.model_name,
+        chunk_size=args.chunk_size,
+        chunk_overlap=args.chunk_overlap,
         device=device
     )
