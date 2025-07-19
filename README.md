@@ -5,7 +5,7 @@
 - 최신 IT 뉴스 데이터를 임베딩하여 **Chroma 벡터 DB에 저장**
 - 사용자 질의에 대한 관련 문서를 DB에서 검색하여 **LLM에 문맥(context)과 함께 질의(question)**
 - **FastAPI** 기반 REST API로  `/generate` `/rag` 엔드포인트 제공
-- 모든 구성 요소는 Kubernetes 클러스터에 배포되며, 노드 배치 및 GPU 리소스를 효율적으로 활용하도록 스케줄링
+- 모든 구성 요소는 Kubernetes 클러스터에 배포되며, 노드 배치 및 GPU 리소스를 효율적으로 활용하도록 설계
 - 외부 통신 가능하도록 NodePort로 서비스 설정
 
 ## 구성 요소
