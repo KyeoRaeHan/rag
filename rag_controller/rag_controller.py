@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-import nest_asyncio
+# import nest_asyncio
 import uvicorn
 from threading import Thread
 import logging
@@ -16,7 +16,9 @@ from chromadb.config import Settings
 app = FastAPI()
 logger = logging.getLogger(__name__)
 
-nest_asyncio.apply()
+# Colab환경에서 사용
+# nest_asyncio.apply()
+
 
 # 모델 및 임베딩 로드
 LLM_MODEL_NAME = "nlpai-lab/kullm-polyglot-5.8b-v2"
@@ -37,11 +39,13 @@ vectordb = Chroma(
     client_settings=Settings(
         chroma_db_impl="duckdb+parquet",
         persist_directory="./chroma_db",
-        anonymized_telemetry=False
+        anonymized_telemetry=False # 익명 사용 정보 외부 전송 비활성화. 필수!
     )
 )
 
-retriever = vectordb.as_retriever(search_kwargs={"k": 3})
+
+# Retriever 객체로 변환
+retriever = vectordb.as_retriever(search_kwargs={"k": 3, "score_threshold": 0.8})
 
 
 # 요청/응답 스키마
@@ -58,11 +62,10 @@ class PromptResponse(BaseModel):
     answer: str
 
 
-# 라우터
+# 엔드포인트
 @app.get("/health", summary="Health check")
 def health():
     return {"status": "ok"}
-
 
 @app.post("/generate", summary="Text generation")
 def generate(request: GenerateRequest):
@@ -76,7 +79,7 @@ def generate(request: GenerateRequest):
     """
 
     try:
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=2048).to(device)
         inputs.pop("token_type_ids", None)
 
         # 추론 시 gradient 계산 비활성화 (메모리 절약)
@@ -90,16 +93,15 @@ def generate(request: GenerateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
 
-
 @app.post("/rag", summary="Rag")
 def rag_query(request: PromptRequest):
 
     query = request.query
+    
+    # 질의(query)에 유사한 문서 3개 검색
     docs = retriever.get_relevant_documents(query)
 
-    print(f"Retrieved docs: {len(docs)}")
-
-    context = "\n".join(doc.page_content for doc in docs)
+    context = "\n\n".join(doc.page_content for doc in docs)
 
     prompt = f"""문서 내용을 참고하여 질문에 답해보자.
 
