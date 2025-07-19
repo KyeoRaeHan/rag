@@ -12,7 +12,6 @@ from langchain.embeddings.base import Embeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
 from langchain.vectorstores import Chroma
 
-import chromadb
 from chromadb.config import Settings
 
 
