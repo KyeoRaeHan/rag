@@ -84,13 +84,14 @@ def build_chroma(
         chunk_overlap: int,
         device: str):
 
-    log.info(f"▶ 시작: data_path={data_path} | persist_dir={persist_dir}")
+    log.info(f"시작: data_path={data_path} | persist_dir={persist_dir}")
 
-    # 문서 나누기
+    # 헤더 기준 문서 나누기
     header_splitter = MarkdownHeaderTextSplitter(
         headers_to_split_on=[("###", "h3"), ("##", "h2"), ("#", "h1")]
     )
 
+    # chunk_size로 문서 나누기
     char_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -126,7 +127,6 @@ def build_chroma(
         header_sections = header_splitter.split_text(doc.page_content)
 
         for section in header_sections:
-
             section_doc = Document(page_content=str(section), metadata={"source": source})
             split_docs = char_splitter.split_documents([section_doc])
 
@@ -157,11 +157,11 @@ def build_chroma(
             clean_doc = doc[:80].replace("\n", " ")
             log.info(f" Preview #{i+1} | '{clean_doc}...'")
 
-    return vectordb.as_retriever(search_kwargs={"k": 3})
+    return vectordb.as_retriever(search_kwargs={"k": 3, "score_threshold": 0.8})
 
 # 배치 flush
 def _flush_batch(vectordb: Chroma, docs_batch: List[Document], batch_idx: int):
-    log.info(f"▶ Batch {batch_idx} | size={len(docs_batch)}")
+    log.info(f"Batch {batch_idx} | size={len(docs_batch)}")
     vectordb._collection.add(
         documents=[d.page_content for d in docs_batch],
         metadatas=[d.metadata for d in docs_batch],
@@ -170,7 +170,7 @@ def _flush_batch(vectordb: Chroma, docs_batch: List[Document], batch_idx: int):
 
 # main
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="vectordb builder")
+    parser = argparse.ArgumentParser(description="vectordb-setting")
     parser.add_argument("--data-path", default=os.getenv("DATA_PATH", "./it_tech_news_data"))
     parser.add_argument("--persist-dir", default=os.getenv("PERSIST_DIR", "./chroma_db"))
     parser.add_argument("--batch-size", type=int, default=int(os.getenv("BATCH_SIZE", 32)))
