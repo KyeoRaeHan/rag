@@ -35,11 +35,11 @@ spec:
           command: [ "python", "vectordb_setting.py" ]
           args:
             - "--data-path"
-            - "/app/data"
+            - "/app/it_tech_news_data"
             - "--persist-dir"
             - "/app/chroma_db"
             - "--batch-size"
-            - "64"
+            - "32"
             - "--persist-every"
             - "3"
             - "--preview"
