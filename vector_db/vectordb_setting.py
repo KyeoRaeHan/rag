@@ -152,9 +152,9 @@ def build_chroma(
 
     # Preview
     if preview > 0:
-        sample = vectordb._collection.get(include=["documents"], limit=preview)
-        for i, doc in enumerate(sample["documents"]):
-            clean_doc = doc[:80].replace("\n", " ")
+        sample = vectordb.similarity_search("MCP에 대해 설명해줘", k=preview) 
+        for i, doc in enumerate(sample):
+            clean_doc = doc.page_content[:80].replace("\n", " ")
             log.info(f" Preview #{i+1} | '{clean_doc}...'")
 
     return vectordb.as_retriever(search_kwargs={"k": 3, "score_threshold": 0.8})
