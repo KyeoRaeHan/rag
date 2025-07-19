@@ -7,9 +7,10 @@ import uvicorn
 from threading import Thread
 import logging
 
-from vector_db.vectorsdb_setting import Chroma
-from vector_db.vectorsdb_setting import KananaEmbeddings
+from langchain.vectorstores import Chroma
 from chromadb.config import Settings
+
+from vector_db.vectorsdb_setting import KananaEmbeddings
 
 
 # 설정
