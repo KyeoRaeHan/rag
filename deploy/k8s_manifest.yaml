@@ -52,20 +52,6 @@ spec:
           volumeMounts:
             - name: vectordb-vol
               mountPath: /app/chroma_db
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            failureThreshold: 3
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 30
-            failureThreshold: 3
       volumes:
         - name: vectordb-vol
           persistentVolumeClaim:
@@ -77,7 +63,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: rag-controller
-  namespace: rag-controller
+  namespace: vector-db
   labels:
     app: rag-controller
 spec:
@@ -110,16 +96,16 @@ spec:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 3
           livenessProbe:
-              httpGet:
-                path: /health
-                port: 8000
-              initialDelaySeconds: 10
-              periodSeconds: 30
-              failureThreshold: 3
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 3
       volumes:
         - name: vectordb-vol
           persistentVolumeClaim:
@@ -131,7 +117,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: rag-controller-service
-  namespace: rag-controller
+  namespace: vector-db
 spec:
   type: NodePort
   selector:
