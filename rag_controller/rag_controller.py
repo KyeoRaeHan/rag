@@ -7,7 +7,7 @@ import logging
 from langchain.vectorstores import Chroma
 from chromadb.config import Settings
 
-from vector_db.vectorsdb_setting import KananaEmbeddings
+from vector_db.vectordb_setting import KananaEmbeddings
 
 
 # 설정
@@ -40,7 +40,6 @@ TOKENIZER_CONFIG = {
     "truncation": True,
     "max_length": 2048
 }
-
 
 # 모델 및 임베딩 로드
 logger.info(f"Loading LLM model: {LLM_MODEL_NAME} on {device}")

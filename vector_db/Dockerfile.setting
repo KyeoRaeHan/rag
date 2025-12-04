@@ -13,7 +13,15 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY . .
+# 필요한 파일만 복사
+COPY vector_db/requirements.txt requirements.txt
+COPY vector_db/vectordb_setting.py vectordb_setting.py
+COPY vector_db/it_tech_news_data/ it_tech_news_data/
+
+# 설치 중 OOM 방지 및 tokenizer 관련 에러 방지 옵션 설정
+ENV TRANSFORMERS_CACHE=/app/cache
+ENV HF_HUB_CACHE=/app/cache
+ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:64
 
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir --prefer-binary -r requirements.txt

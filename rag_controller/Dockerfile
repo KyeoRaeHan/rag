@@ -13,7 +13,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY . .
+# 필요한 파일만 복사 (vector_db 모듈 import를 위해 상위 구조 유지)
+COPY rag_controller/requirements.txt requirements.txt
+COPY rag_controller/rag_controller.py rag_controller.py
+COPY vector_db/vectordb_setting.py vector_db/vectordb_setting.py
 
 # 설치 중 OOM 방지 및 tokenizer 관련 에러 방지 옵션 설정
 ENV TRANSFORMERS_CACHE=/app/cache
