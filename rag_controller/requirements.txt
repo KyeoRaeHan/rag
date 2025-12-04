@@ -1,0 +1,13 @@
+langchain==0.0.255
+chromadb==0.3.29
+unstructured
+transformers==4.40.1
+huggingface-hub==0.23.0
+torch==2.1.2
+fastapi==0.85.1
+uvicorn[standard]==0.22.0
+pydantic==1.10.13
+duckdb==1.2.2
+python-dotenv==1.0.1
+posthog==2.5.0
+uvicorn

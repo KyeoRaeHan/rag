@@ -1,0 +1,22 @@
+# VectorDB 생성, vectordb-setting:latest 도커 이미지
+FROM python:3.11-slim
+
+# 환경 설정
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY . .
+
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --prefer-binary -r requirements.txt
+
+# 벡터 DB 구축 실행
+CMD ["python", "vectordb_setting.py"]

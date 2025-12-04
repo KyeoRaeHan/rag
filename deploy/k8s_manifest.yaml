@@ -1,0 +1,144 @@
+# VectorDB 저장용 PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chroma-pvc
+  namespace: vector-db
+spec:
+  accessModes:
+#    - ReadWriteOnce 시간차 배포시 사용
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# VectorDB 최초 생성 Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vectordb-setting
+  namespace: vector-db
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      nodeSelector:
+          nodepool-name: gpu1
+          nvidia.com/mig-7g.80gb: "1"
+      restartPolicy: Never
+      containers:
+        - name: vectordb-setting
+          image: vectordb-setting:latest
+          imagePullPolicy: IfNotPresent
+          command: [ "python", "vectordb_setting.py" ]
+          args:
+            - "--data-path"
+            - "/app/it_tech_news_data"
+            - "--persist-dir"
+            - "/app/chroma_db"
+            - "--batch-size"
+            - "32"
+            - "--persist-every"
+            - "3"
+            - "--preview"
+            - "2"
+            - "--model-name"
+            - "sentence-transformers/all-mpnet-base-v2"
+          resources:
+            limits:
+              nvidia.com/mig-7g.80gb: "1"
+          volumeMounts:
+            - name: vectordb-vol
+              mountPath: /app/chroma_db
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+      volumes:
+        - name: vectordb-vol
+          persistentVolumeClaim:
+              claimName: chroma-pvc
+
+---
+# RAG Controller Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-controller
+  namespace: rag-controller
+  labels:
+    app: rag-controller
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rag-controller
+  template:
+    metadata:
+      labels:
+        app: rag-controller
+    spec:
+      nodeSelector:
+        nodepool-name: gpu2
+        nvidia.com/mig-7g.80gb: "1"
+      containers:
+        - name: rag-controller
+          image: rag-controller:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              nvidia.com/mig-7g.80gb: "1"
+          volumeMounts:
+            - name: vectordb-vol
+              mountPath: /app/chroma_db
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+              httpGet:
+                path: /health
+                port: 8000
+              initialDelaySeconds: 10
+              periodSeconds: 30
+              failureThreshold: 3
+      volumes:
+        - name: vectordb-vol
+          persistentVolumeClaim:
+            claimName: chroma-pvc
+
+---
+# RAG Controller Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-controller-service
+  namespace: rag-controller
+spec:
+  type: NodePort
+  selector:
+    app: rag-controller
+  ports:
+    - name: rag-http
+      port: 8000
+      targetPort: 8000
+      nodePort: 30080
+      protocol: TCP
